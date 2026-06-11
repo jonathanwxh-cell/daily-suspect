@@ -175,4 +175,29 @@ describe("Hetzner API contract", () => {
     assert.equal(session.transcript.length, 3);
     assert.equal(session.transcript[1].text, "Why is there frosting on your cheek?");
   });
+
+  it("ignores a repeated question (no damage, flags it) so spam can't grind a crack", async () => {
+    const app = createApp({ store: createMemoryStore(), model: severityModel(2, "I told you, I was home.") });
+    const sessionId = await newSession(app);
+    const q = "Where were you at noon on the day of the theft?";
+    const t1 = await json(await app.handle(request("/api/interrogate", { method: "POST", body: JSON.stringify({ sessionId, question: q }) })));
+    const t2 = await json(await app.handle(request("/api/interrogate", { method: "POST", body: JSON.stringify({ sessionId, question: q }) })));
+    assert.equal(t1.body.delta, -16);
+    assert.equal(t2.body.delta, 0);
+    assert.match(t2.body.read, /already asked/);
+  });
+
+  it("returns NEAR_MISS (not a flat walk) when a worked case ends on a wrong theory", async () => {
+    const app = createApp({ store: createMemoryStore(), model: severityModel(2, "...") });
+    const sessionId = await newSession(app); // lucas, start 40
+    for (const q of ["Why is there frosting on your cheek?", "What exactly did you feed the dog?"]) {
+      await app.handle(request("/api/interrogate", { method: "POST", body: JSON.stringify({ sessionId, question: q }) }));
+    }
+    // composure now 40 - 16 - 16 = 8 (<= 50% of start) and investigated (2 questions)
+    const verdict = await json(await app.handle(request("/api/accuse", { method: "POST", body: JSON.stringify({ sessionId, theoryIndex: 0 }) })));
+    assert.equal(verdict.body.outcome, "NEAR_MISS");
+    assert.equal(verdict.body.correct, false);
+    assert.equal(verdict.body.truthSealed, true);
+    assert.equal(verdict.body.rank, "D");
+  });
 });

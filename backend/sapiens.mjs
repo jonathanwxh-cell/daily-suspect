@@ -24,6 +24,7 @@ export function buildSapiensChatRequest(prompt, config) {
     body: {
       model: config.model?.trim() || DEFAULT_SAPIENS_MODEL,
       max_tokens: config.maxTokens || 1000,
+      temperature: config.temperature ?? 0.2,
       messages: [{ role: "user", content: prompt }],
     },
   };

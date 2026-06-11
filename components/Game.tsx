@@ -10,9 +10,9 @@ import type { PublicCase, Suggested } from "@/lib/types";
 // sees public case data + per-turn API responses.
 // ============================================================
 
-type Msg = { role: "det" | "sus"; text: string; delta?: number };
+type Msg = { role: "det" | "sus"; text: string; delta?: number; read?: string };
 
-type Outcome = "CONFESSED" | "CASE_CLOSED" | "HUNCH" | "WALKED_FREE";
+type Outcome = "CONFESSED" | "CASE_CLOSED" | "HUNCH" | "NEAR_MISS" | "WALKED_FREE";
 type Verdict = {
   outcome: Outcome;
   correct: boolean;
@@ -178,6 +178,7 @@ function SuspectLine({ m, caze, isLatest, sfxOn, sfx }: { m: Msg; caze: PublicCa
       <p className="text-[10px] tracking-widest opacity-50">
         {caze.name.toUpperCase()}
         {m.delta ? <span style={{ color: m.delta <= -18 ? "#e05555" : "#c9913a" }}> {m.delta}</span> : null}
+        {m.read ? <span className="opacity-60 italic normal-case tracking-normal"> · {m.read}</span> : null}
       </p>
       <p className="text-sm leading-snug">
         {shown}
@@ -375,6 +376,7 @@ export default function Game() {
       const r = await apiFetch<{
         reply: string;
         delta: number;
+        read?: string;
         composure: number;
         cracked: boolean;
         suggested: Suggested[];
@@ -383,7 +385,7 @@ export default function Game() {
         method: "POST",
         body: JSON.stringify({ sessionId, question: q }),
       });
-      setTranscript([...newTranscript, { role: "sus", text: r.reply, delta: r.delta }]);
+      setTranscript([...newTranscript, { role: "sus", text: r.reply, delta: r.delta, read: r.read }]);
       setComposure(r.composure);
       setQuestionsUsed(questionsUsed + 1);
       setBiggestHit((b) => Math.max(b, -r.delta));
@@ -432,11 +434,13 @@ export default function Game() {
     const label =
       outcome === "CONFESSED" ? "CONFESSION" :
       outcome === "CASE_CLOSED" ? "CASE CLOSED" :
-      outcome === "HUNCH" ? "LUCKY HUNCH" : "WALKED FREE";
+      outcome === "HUNCH" ? "LUCKY HUNCH" :
+      outcome === "NEAR_MISS" ? "SO CLOSE" : "WALKED FREE";
     const icon =
       outcome === "CONFESSED" ? "🚨" :
       outcome === "CASE_CLOSED" ? "🔒" :
-      outcome === "HUNCH" ? "🎲" : "🚪";
+      outcome === "HUNCH" ? "🎲" :
+      outcome === "NEAR_MISS" ? "😬" : "🚪";
     const broke = Math.max(0, Math.min(8, Math.round((1 - composure / caze.startComposure) * 8)));
     const bar = "🟥".repeat(broke) + "⬛".repeat(8 - broke);
     const streakLine = streak > 1 ? `\n🔥 ${streak}-day streak` : "";
@@ -791,13 +795,14 @@ export default function Game() {
         {screen === "verdict" && caze && (
           <div className="ds-fade text-center">
             <div className="py-5">
-              <span className="ds-stamp text-3xl" style={{ color: won ? "#5f9e6e" : outcome === "HUNCH" ? "#c9913a" : "#e05555" }}>
-                {outcome === "CONFESSED" ? "Confessed" : outcome === "CASE_CLOSED" ? "Case Closed" : outcome === "HUNCH" ? "Lucky Hunch" : "Walked Free"}
+              <span className="ds-stamp text-3xl" style={{ color: won ? "#5f9e6e" : (outcome === "HUNCH" || outcome === "NEAR_MISS") ? "#c9913a" : "#e05555" }}>
+                {outcome === "CONFESSED" ? "Confessed" : outcome === "CASE_CLOSED" ? "Case Closed" : outcome === "HUNCH" ? "Lucky Hunch" : outcome === "NEAR_MISS" ? "So Close" : "Walked Free"}
               </span>
               <p className="text-[11px] opacity-70 mt-3 px-6 leading-snug">
                 {outcome === "CONFESSED" ? "You broke them. Full confession on the record." :
                  outcome === "CASE_CLOSED" ? "Right call, backed by your interrogation. Truth declassified." :
                  outcome === "HUNCH" ? "You guessed right — but you never earned the why." :
+                 outcome === "NEAR_MISS" ? "You had them on the ropes — wrong theory, but you did the work." :
                  "Wrong call. They walked, and the truth stays sealed."}
               </p>
               <div className="mt-4">
@@ -815,6 +820,8 @@ export default function Game() {
                 <p className="text-xs leading-relaxed opacity-80">
                   {outcome === "HUNCH"
                     ? "A lucky theory isn’t an investigation. Question the suspect — crack them, or earn it with evidence — to declassify what really happened."
+                    : outcome === "NEAR_MISS"
+                    ? "You pushed them to the brink, but pinned the wrong theory. The truth stays sealed — come back and close it clean."
                     : "Case filed unsolved. Break the suspect, or accuse correctly with real evidence, to declassify the truth."}
                 </p>
               </div>

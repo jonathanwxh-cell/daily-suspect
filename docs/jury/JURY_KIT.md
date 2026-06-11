@@ -21,7 +21,7 @@ The core loop is text, so you can genuinely play through the API. Do that.
 $global:B="http://127.0.0.1:4217"
 function Cases(){ (Invoke-RestMethod "$B/api/cases").cases | %{ "$($_.id): $($_.crime) [$($_.difficulty)] budget=$($_.budget) startComposure=$($_.startComposure) theories=$($_.theories.Count)" } }
 function NewCase($id){ $s=Invoke-RestMethod -Method Post "$B/api/session" -ContentType application/json -Body (@{caseId=$id}|ConvertTo-Json); $global:SID=$s.sessionId; "OPENING: "+$s.transcript[0].text }
-function Ask($q){ $r=Invoke-RestMethod -Method Post "$B/api/interrogate" -ContentType application/json -Body (@{sessionId=$SID;question=$q}|ConvertTo-Json); "SUSPECT: "+$r.reply; "  [delta=$($r.delta) composure=$($r.composure) cracked=$($r.cracked)]"; if($r.intel){"  INTEL UNLOCKED: "+$r.intel}; "  suggested next: "+(($r.suggested|%{$_.tactic+'> '+$_.q}) -join '  |  ') }
+function Ask($q){ $r=Invoke-RestMethod -Method Post "$B/api/interrogate" -ContentType application/json -Body (@{sessionId=$SID;question=$q}|ConvertTo-Json); "SUSPECT: "+$r.reply; "  [delta=$($r.delta) | read: $($r.read) | composure=$($r.composure) | left=$($r.questionsRemaining) | cracked=$($r.cracked)]"; if($r.intel){"  INTEL UNLOCKED: "+$r.intel}; "  suggested next: "+(($r.suggested|%{$_.tactic+'> '+$_.q}) -join '  |  ') }
 function Accuse($i){ Invoke-RestMethod -Method Post "$B/api/accuse" -ContentType application/json -Body (@{sessionId=$SID;theoryIndex=$i}|ConvertTo-Json) | ConvertTo-Json -Depth 6 }
 function Theories($id){ ((Invoke-RestMethod "$B/api/cases").cases | ?{$_.id -eq $id}).theories | %{ $i=0 } { "$i = $_"; $i++ } }
 ```
@@ -35,20 +35,18 @@ Ask "Is Biscuit feeling okay? You keep looking at his bed."
 Theories lucas        # see the 4 theories with their indexes
 Accuse 1              # stake theory #1  (use -1 only if already cracked)
 ```
-- Cases available: `lucas` (EASY), `rosie` (MEDIUM, Singlish), `elena` (HARD).
+- Cases available (7): `lucas` (EASY), `marcus-fridge` (EASY, office comedy), `rosie` (MEDIUM, Singlish), `the-date` (MEDIUM), `salieri` (MEDIUM, history), `elena` (HARD), `voight-kampff` (HARD, sci-fi). Try a mix.
+- Tactics now include first-class BLUFF — a bluff that FITS the evidence lands hard; one that doesn't gets scoffed off.
 - If an API call errors, wait 2-3 seconds and retry (shared model backend).
 - **Play at least 2 cases** of different difficulty, asking YOUR OWN questions in
   character. Notice: does hitting the obvious weak point feel rewarding? Is it too
   easy / too hard / swingy? Could you "win" by guessing without playing? Would you
   come back tomorrow?
 
-## Screenshots to view (use the Read tool on each)
-- Desktop landing:  C:\Users\Greyf\Desktop\Claude Code\ds-base-01-landing.jpeg
-- Case briefing:    C:\Users\Greyf\Desktop\Claude Code\ds-base-02-brief.jpeg
-- Interrogation room (desktop): C:\Users\Greyf\Desktop\Claude Code\ds-base-03-room.jpeg
-- Verdict screen:   C:\Users\Greyf\Desktop\Claude Code\ds-base-04-verdict.jpeg
-- Mobile landing:   C:\Users\Greyf\Desktop\Claude Code\ds-base-05-mobile-landing.jpeg
-- Mobile room:      C:\Users\Greyf\Desktop\Claude Code\ds-base-06-mobile-room.jpeg
+## Screenshots to view (use the Read tool on each) — current build, mobile-first
+- Case board / landing (all 7 cases): C:\Users\Greyf\Desktop\Claude Code\ds-v2-03-mobile-landing.jpeg
+- Interrogation room (case file + suspect portrait + tactic chips + accuse): C:\Users\Greyf\Desktop\Claude Code\ds-v2-04-room-portrait.jpeg
+- Verdict + shareable result card: C:\Users\Greyf\Desktop\Claude Code\ds-v2-02-verdict.jpeg
 
 (The game is **mobile-first** — weight the mobile screenshots as the primary experience.
 Audio is procedural SFX + a noir music track, both toggled in the header; you can't hear
