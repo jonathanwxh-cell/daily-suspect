@@ -1,27 +1,29 @@
 # ROADMAP
 
-## Now (v0.3 - shipped in this repo)
-- [x] Server-authoritative engine, 3 launch cases, full game feel, procedural SFX, noir score
-- [x] Migrate interrogation provider from Anthropic to Sapiens/Agnes chat completions
-- [x] Local desktop + 390px mobile playtest for Sapiens migration
-- [ ] Set SAPIENS_API_KEY in Vercel (human task - game is dead without it)
-- [ ] Mobile vibe-check on production URL
+## Now (v0.4 - in progress)
+- [x] Move game compute from Vercel API routes to Hetzner Node backend
+- [x] Add backend-owned sessions for transcript, composure, question count, cracked state, and verdicts
+- [x] Add Postgres session store for Hetzner plus memory store for tests/local development
+- [x] Convert Vercel app to frontend-only API client
+- [ ] Deploy backend to Hetzner systemd + Cloudflare Tunnel
+- [ ] Set `NEXT_PUBLIC_DAILY_SUSPECT_API_URL` in Vercel
+- [ ] Production desktop and 390px mobile playtest against the Hetzner API
 
-## Next (v0.4 - pick ONE per session)
-- [ ] **Daily case pipeline**: script `scripts/generate-case.ts` - agent writes a new Case JSON, a second adversarial pass auto-playtests it (can it be cracked in budget? does tactic-spam fail?), human approves, merge. This is the moat.
-- [ ] Supabase: anonymous results table + per-case leaderboard (fewest questions to crack)
-- [ ] Daily rotation: `/api/daily` selects case by date; share grid numbers the day ("Suspect #14")
-- [ ] 3 more cases (one per category: sci-fi Voight-Kampff, The Date, History)
+## Next (v0.5 - pick one per session)
+- [ ] Rate limit `/api/interrogate` before sharing the URL widely
+- [ ] Daily case pipeline: agent writes a new case, second pass adversarially playtests it, human approves, merge
+- [ ] Anonymous results table + per-case leaderboard
+- [ ] Daily rotation: select case by date and share day number
+- [ ] 3 more cases: sci-fi Voight-Kampff, The Date, History
 
 ## Later
 - [ ] Streaks + local detective rank progression
-- [ ] "You're the Suspect" inverted mode (AI interrogates the player, tracks contradictions)
-- [ ] UGC case builder (users author suspects; needs moderation pass)
+- [ ] "You're the Suspect" inverted mode
+- [ ] UGC case builder with moderation pass
 - [ ] Per-case ambient music variants
 - [ ] i18n: full Singlish UI mode
 
-## Known debt
-- Composure is sent from client per turn (server clamps but trusts the value). Fix: server-side session store (Supabase) keyed by game id.
-- `/api/accuse` returns the case reveal for any valid `caseId` + `theoryIndex`. Add server-side session gating if the reveal must stay hidden until a legitimate accusation state.
-- Media presigned URLs replaced by committed files - done, but portraits are unoptimized jpg (~MBs); consider next/image + compression.
-- No rate limiting on /api/interrogate; add per-IP limit before sharing the URL widely.
+## Known Debt
+- Media presigned URLs were replaced by committed files; portraits are still unoptimized jpgs.
+- No rate limiting on `/api/interrogate`.
+- Hidden game truths are protected from the browser/runtime API, but the public GitHub repository still contains case answers in `backend/cases.mjs`.

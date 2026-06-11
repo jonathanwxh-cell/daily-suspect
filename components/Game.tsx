@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import type { PublicCase, Suggested } from "@/lib/cases";
+import { apiFetch } from "@/lib/api-client";
+import type { PublicCase, Suggested } from "@/lib/types";
 
 // ============================================================
 // DAILY SUSPECT — client game shell.
@@ -173,9 +174,13 @@ function SuspectLine({ m, caze, isLatest, sfxOn, sfx }: { m: Msg; caze: PublicCa
 }
 
 // ---------- Main ----------
-export default function Game({ cases }: { cases: PublicCase[] }) {
+export default function Game() {
+  const [cases, setCases] = useState<PublicCase[]>([]);
+  const [casesLoading, setCasesLoading] = useState(true);
+  const [casesError, setCasesError] = useState("");
   const [screen, setScreen] = useState<"title" | "brief" | "enter" | "room" | "accuse" | "verdict">("title");
   const [caze, setCaze] = useState<PublicCase | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<Msg[]>([]);
   const [composure, setComposure] = useState(100);
   const [questionsUsed, setQuestionsUsed] = useState(0);
@@ -201,6 +206,23 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
   if (!sfxRef.current && typeof window !== "undefined") sfxRef.current = makeSfx();
   const sfx = sfxRef.current || { tap() {}, type() {}, hit() {}, stamp() {}, crack() {}, beat() {} };
 
+  const loadCases = async () => {
+    setCasesLoading(true);
+    setCasesError("");
+    try {
+      const data = await apiFetch<{ cases: PublicCase[] }>("/api/cases");
+      setCases(data.cases || []);
+    } catch {
+      setCasesError("Case board is offline. Try again in a moment.");
+    } finally {
+      setCasesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCases();
+  }, []);
+
   useEffect(() => {
     const t = setInterval(() => setPulse((p) => p + 0.15), 80);
     return () => clearInterval(t);
@@ -225,20 +247,38 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
 
   const startCase = (c: PublicCase) => { if (soundOn) sfx.tap(); setCaze(c); setScreen("brief"); };
 
-  const enterRoom = () => {
+  const enterRoom = async () => {
     if (!caze) return;
     if (soundOn) sfx.stamp();
-    setTranscript([{ role: "sus", text: caze.opening }]);
-    setComposure(caze.startComposure);
-    setQuestionsUsed(0);
-    setSuggested(caze.starters);
-    setCracked(false);
-    setVerdict(null);
     setErrMsg("");
-    setIntelUnlocked([]);
-    setBiggestHit(0);
-    setScreen("enter");
-    setTimeout(() => setScreen("room"), 1400);
+    setBusy(true);
+    try {
+      const data = await apiFetch<{
+        sessionId: string;
+        transcript: Msg[];
+        composure: number;
+        questionsUsed: number;
+        suggested: Suggested[];
+      }>("/api/session", {
+        method: "POST",
+        body: JSON.stringify({ caseId: caze.id }),
+      });
+      setSessionId(data.sessionId);
+      setTranscript(data.transcript?.length ? data.transcript : [{ role: "sus", text: caze.opening }]);
+      setComposure(data.composure ?? caze.startComposure);
+      setQuestionsUsed(data.questionsUsed ?? 0);
+      setSuggested(data.suggested?.length ? data.suggested : caze.starters);
+      setCracked(false);
+      setVerdict(null);
+      setIntelUnlocked([]);
+      setBiggestHit(0);
+      setScreen("enter");
+      setTimeout(() => setScreen("room"), 1400);
+    } catch {
+      setErrMsg("Case room is offline. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const toggleMusic = () => {
@@ -250,14 +290,12 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
   const toggleSound = () => { if (!soundOn) sfx.tap(); setSoundOn(!soundOn); };
 
   const fetchVerdict = async (theoryIndex: number, theoryLabel: string | null) => {
-    if (!caze) return;
+    if (!caze || !sessionId) return;
     try {
-      const res = await fetch("/api/accuse", {
+      const r = await apiFetch<{ correct: boolean; reveal: string }>("/api/accuse", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId: caze.id, theoryIndex }),
+        body: JSON.stringify({ sessionId, theoryIndex }),
       });
-      const r = await res.json();
       setVerdict({ correct: !!r.correct, reveal: r.reveal || "", theory: theoryLabel });
     } catch {
       setVerdict({ correct: theoryIndex === -1, reveal: "", theory: theoryLabel });
@@ -265,7 +303,7 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
   };
 
   const ask = async (q: string) => {
-    if (busy || cracked || !caze) return;
+    if (busy || cracked || !caze || !sessionId) return;
     if (soundOn) sfx.tap();
     setBusy(true);
     setErrMsg("");
@@ -273,16 +311,17 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
     const newTranscript: Msg[] = [...transcript, { role: "det", text: q }];
     setTranscript(newTranscript);
     try {
-      const res = await fetch("/api/interrogate", {
+      const r = await apiFetch<{
+        reply: string;
+        delta: number;
+        composure: number;
+        cracked: boolean;
+        suggested: Suggested[];
+        intel: string | null;
+      }>("/api/interrogate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId: caze.id, transcript, question: q, composure }),
+        body: JSON.stringify({ sessionId, question: q }),
       });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || "request failed");
-      }
-      const r = await res.json();
       setTranscript([...newTranscript, { role: "sus", text: r.reply, delta: r.delta }]);
       setComposure(r.composure);
       setQuestionsUsed(questionsUsed + 1);
@@ -355,7 +394,13 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
     document.body.removeChild(ta);
   };
 
-  const reset = () => { if (soundOn) sfx.tap(); setScreen("title"); setCaze(null); };
+  const reset = () => {
+    if (soundOn) sfx.tap();
+    setScreen("title");
+    setCaze(null);
+    setSessionId(null);
+    setErrMsg("");
+  };
 
   const tacticColor: Record<string, string> = { PRESSURE: "#e05555", EMPATHY: "#5f9e6e", LOGIC: "#5d93bd", BLUFF: "#c9913a" };
 
@@ -397,25 +442,34 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
               Make them<br />talk.
             </h1>
             <p className="text-[11px] opacity-50 mb-5">Turn on ♫ and SFX. This game is meant to be heard.</p>
-            <div className="space-y-3">
-              {cases.map((c, i) => (
-                <button key={c.id} onClick={() => startCase(c)} className="w-full ds-paper p-0 text-left" style={{ border: "none", display: "block", transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }}>
-                  <div className="ds-paper-edge" />
-                  <div className="p-3 flex gap-3 items-center">
-                    <Portrait caze={c} size={64} tilt={i % 2 ? 2 : -2} />
-                    <div className="min-w-0">
-                      <span className="ds-display text-base">{c.crime}</span>
-                      <p className="text-xs opacity-80 leading-snug mt-0.5">{c.tagline}</p>
-                      <div className="flex gap-2 mt-1.5 text-[10px] tracking-widest">
-                        <span style={{ color: c.color, fontWeight: 700 }}>{c.difficulty}</span>
-                        <span className="opacity-60">{c.budget} QUESTIONS</span>
-                        <span className="opacity-60">COMPOSURE {c.startComposure}</span>
+            {casesLoading ? (
+              <div className="ds-paper p-4 text-xs opacity-75">Loading case board...</div>
+            ) : casesError ? (
+              <div className="ds-paper p-4">
+                <p className="text-xs mb-3" style={{ color: "#e05555" }}>{casesError}</p>
+                <button onClick={loadCases} className="ds-chip px-3 py-2 text-xs">TRY AGAIN</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {cases.map((c, i) => (
+                  <button key={c.id} onClick={() => startCase(c)} className="w-full ds-paper p-0 text-left" style={{ border: "none", display: "block", transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }}>
+                    <div className="ds-paper-edge" />
+                    <div className="p-3 flex gap-3 items-center">
+                      <Portrait caze={c} size={64} tilt={i % 2 ? 2 : -2} />
+                      <div className="min-w-0">
+                        <span className="ds-display text-base">{c.crime}</span>
+                        <p className="text-xs opacity-80 leading-snug mt-0.5">{c.tagline}</p>
+                        <div className="flex gap-2 mt-1.5 text-[10px] tracking-widest">
+                          <span style={{ color: c.color, fontWeight: 700 }}>{c.difficulty}</span>
+                          <span className="opacity-60">{c.budget} QUESTIONS</span>
+                          <span className="opacity-60">COMPOSURE {c.startComposure}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="text-[11px] opacity-50 mt-5 leading-relaxed">
               Every suspect hides one truth. Hit a pressure point and their composure drops — drop it to zero and they break. Or run out of questions and stake your accusation.
             </p>
@@ -448,9 +502,10 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
                 </div>
               </div>
             </div>
-            <button onClick={enterRoom} className="w-full mt-4 py-3 ds-display tracking-widest text-base" style={{ background: caze.color, color: "#14120f", border: "none" }}>
+            <button onClick={enterRoom} disabled={busy} className="w-full mt-4 py-3 ds-display tracking-widest text-base disabled:opacity-60" style={{ background: caze.color, color: "#14120f", border: "none" }}>
               ENTER THE ROOM →
             </button>
+            {errMsg && <p className="text-xs mt-2" style={{ color: "#e05555" }}>{errMsg}</p>}
             <button onClick={reset} className="w-full mt-2 py-2 text-xs opacity-60" style={{ background: "none", border: "none", color: "#e8dfc8" }}>
               back to the board
             </button>

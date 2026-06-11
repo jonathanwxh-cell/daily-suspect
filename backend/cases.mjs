@@ -1,36 +1,7 @@
-// ============================================================
-// CASE DATA — server-only. The hidden truth never ships to the
-// client. Add a new case by appending to CASES (see AGENTS.md).
-// ============================================================
+// Case data for the Hetzner backend.
+// Hidden truth fields are only served from this API.
 
-export type Tactic = "PRESSURE" | "EMPATHY" | "LOGIC" | "BLUFF";
-
-export interface Suggested { tactic: Tactic; q: string; }
-
-export interface Case {
-  id: string;
-  name: string;
-  age: number;
-  crime: string;
-  tagline: string;
-  difficulty: "EASY" | "MEDIUM" | "HARD";
-  color: string;
-  budget: number;
-  startComposure: number;
-  initials: string;
-  room: string;
-  portrait: string;       // public path
-  briefing: string[];
-  intel: string[];        // unlocked at 66% / 33% of startComposure
-  opening: string;
-  starters: Suggested[];
-  persona: string;        // SECRET — system prompt incl. hidden truth
-  theories: { label: string; correct: boolean }[];
-  reveal: string;         // SECRET until verdict
-  confession: string;     // SECRET — canonical breaking-point line
-}
-
-export const CASES: Case[] = [
+export const CASES = [
   {
     id: "lucas",
     name: "Lucas Tan",
@@ -158,13 +129,12 @@ export const CASES: Case[] = [
   },
 ];
 
-export function getCase(id: string): Case | undefined {
+
+export function getCase(id) {
   return CASES.find((c) => c.id === id);
 }
 
-// What the client is allowed to see. NEVER include persona/reveal/confession
-// or theory correctness here.
-export function toPublic(c: Case) {
+export function toPublic(c) {
   return {
     id: c.id,
     name: c.name,
@@ -184,5 +154,3 @@ export function toPublic(c: Case) {
     theories: c.theories.map((t) => t.label),
   };
 }
-
-export type PublicCase = ReturnType<typeof toPublic>;
