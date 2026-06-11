@@ -2,7 +2,7 @@
 
 **Make them talk.** An AI interrogation game: one suspect, a handful of questions, one hidden truth. Tap tactic chips (or type your own questions), hit pressure points to break their composure, get the confession — or run out of questions and stake your accusation.
 
-Live: deployed on Vercel (see project `daily-suspect`).
+Live: https://daily-suspect.vercel.app
 
 ## How it works
 
