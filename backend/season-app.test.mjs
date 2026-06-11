@@ -18,11 +18,11 @@ async function jsonOf(res) {
 
 // Controllable model stub: interrogate prompts get {reply,thread,severity}; present prompts get {reply}.
 function makeStub() {
-  const ctl = { thread: "none", severity: 0, reply: "..." };
+  const ctl = { thread: "none", severity: 0, reply: "...", suggested: [] };
   const model = {
     async complete(prompt) {
-      if (prompt.includes("sets a piece of evidence")) return JSON.stringify({ reply: ctl.reply });
-      return JSON.stringify({ reply: ctl.reply, thread: ctl.thread, severity: ctl.severity });
+      if (prompt.includes("sets a piece of evidence")) return JSON.stringify({ reply: ctl.reply, suggested: ctl.suggested });
+      return JSON.stringify({ reply: ctl.reply, thread: ctl.thread, severity: ctl.severity, suggested: ctl.suggested });
     },
   };
   return { ctl, model };
@@ -55,6 +55,9 @@ async function present(a, sid, suspectId, clueId) {
 }
 async function lock(a, sid, questionId, answer, clues) {
   return jsonOf(await a.handle(request("/api/season/board", { method: "POST", body: JSON.stringify({ sessionId: sid, questionId, answer, clues }) })));
+}
+async function look(a, sid, suspectId, assisted) {
+  return jsonOf(await a.handle(request("/api/season/look", { method: "POST", body: JSON.stringify({ sessionId: sid, suspectId, assisted }) })));
 }
 
 describe("Casefile season — validator", () => {
@@ -134,5 +137,26 @@ describe("Casefile season — engine", () => {
     assert.equal(verdict.body.killer, "shaw");
     assert.match(verdict.body.reveal, /Shaw/);
     assert.ok(["S", "A", "B", "C"].includes(verdict.body.rank));
+  });
+
+  it("returns capped suggested follow-ups", async () => {
+    const { ctl, app: a } = app();
+    const sid = await start(a);
+    ctl.suggested = ["q1", "q2", "q3", "q4", "q5"];
+    const r = await interrogate(a, sid, "shaw", ctl, "diagnosis", 1);
+    assert.ok(Array.isArray(r.body.suggested));
+    assert.ok(r.body.suggested.length <= 3);
+    assert.equal(r.body.suggested[0], "q1");
+  });
+
+  it("surfaces assistPresent only in Assisted mode for a held contradiction clue", async () => {
+    const { ctl, app: a } = app();
+    const sid = await start(a);
+    await breakByQuestion(a, sid, "shaw", ctl, "diagnosis"); // unlock tox_report (contradicts margaret.alibi)
+    const assisted = await look(a, sid, "margaret", true);
+    assert.ok(assisted.body.assistPresent, "assisted should surface a present hint");
+    assert.equal(assisted.body.assistPresent.clueId, "tox_report");
+    const classic = await look(a, sid, "margaret", false);
+    assert.equal(classic.body.assistPresent, null);
   });
 });

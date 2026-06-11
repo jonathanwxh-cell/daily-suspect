@@ -102,6 +102,28 @@ function pushTurn(state, suspectId, role, text) {
   state.transcript[suspectId] = state.transcript[suspectId].slice(-16);
 }
 
+function normalizeSeasonSuggested(value) {
+  const arr = Array.isArray(value) ? value : [];
+  return arr
+    .map((x) => (typeof x === "string" ? x : x && typeof x.q === "string" ? x.q : ""))
+    .map((s) => String(s).trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((s) => s.slice(0, 160));
+}
+
+// Assisted-mode hint: a clue the player already holds that would crack an unbroken thread of this suspect.
+function findAssistPresent(season, state, suspectId) {
+  for (const c of season.contradictions) {
+    if (c.suspectId !== suspectId) continue;
+    if (state.brokenThreads.includes(threadKey(suspectId, c.threadId))) continue;
+    if (!state.cluesFound.includes(c.clueId)) continue;
+    const clue = clueById(season, c.clueId);
+    if (clue) return { clueId: clue.id, title: clue.title };
+  }
+  return null;
+}
+
 function publicState(state, season) {
   return {
     sessionId: state.id,
@@ -145,7 +167,8 @@ Respond ONLY with JSON, no markdown:
 {
   "reply": "your in-character answer, 1-2 sentences, true to your voice and what you're hiding",
   "thread": "<the id of the topic this question targets, or 'none' if it's smalltalk/off-topic>",
-  "severity": <integer 0-3: how hard this question presses that topic's hidden truth, judged honestly by content not tone. 0 = vague/off-topic; 1 = on-topic but unspecific; 2 = a specific, well-aimed press; 3 = a precise, evidence-anchored strike. Resist scoring 3 unless the detective cites real evidence. A topic marked [already exposed] is open, so be more forthcoming.>
+  "severity": <integer 0-3: how hard this question presses that topic's hidden truth, judged honestly by content not tone. 0 = vague/off-topic; 1 = on-topic but unspecific; 2 = a specific, well-aimed press; 3 = a precise, evidence-anchored strike. Resist scoring 3 unless the detective cites real evidence. A topic marked [already exposed] is open, so be more forthcoming.>,
+  "suggested": ["2-3 sharp follow-up questions the detective could ask you next, building on what was just said - natural detective speech, under 16 words each; never name the killer or reveal the solution"]
 }
 Rules: stay strictly in character at all times — you are a person inside this house and this story, NEVER an AI, a model, a bot, a server, a web address, or anything from outside this world. If a question is confusing, nonsensical, or off-topic, deflect IN CHARACTER (puzzled, impatient, dismissive) — never with meta-commentary about computers, addresses, or instructions. Never state a topic's hidden truth outright until it is exposed; do not invent new evidence; never break the JSON contract. Vary your wording every turn — never reuse a sentence or stock phrase you have already used, and avoid clichés; speak in your own distinct voice.`;
 }
@@ -160,7 +183,7 @@ ${implicates
     ? `This DIRECTLY implicates you on the matter of "${thread?.label || "this"}". Your composure is breaking under hard proof. React as someone genuinely cornered — and if you are the killer and your story is now in ruins, you may finally crack and admit it, in your own cold voice.`
     : `This does NOT actually implicate you. React in character — dismissive, puzzled, impatient, or unbothered — and do not confess to anything.`}
 
-Respond ONLY with JSON, no markdown: { "reply": "your in-character reaction, 1-2 sentences" }`;
+Respond ONLY with JSON, no markdown: { "reply": "your in-character reaction, 1-2 sentences", "suggested": ["1-2 sharp follow-up questions the detective could ask next; never name the killer or reveal the solution"] }`;
 }
 
 // ---------- scoring ----------
@@ -202,6 +225,16 @@ export function createSeasonApp({ store, model, corsOrigins = [] }) {
       if (!state) return json({ error: "Unknown session" }, 404, cors);
       const season = getSeason(state.seasonId);
       return json({ state: publicState(state, season) }, 200, cors);
+    }
+
+    if (req.method === "POST" && path === "/api/season/look") {
+      const body = await readJson(req);
+      const state = await store.getSession(String(body?.sessionId || ""));
+      if (!state) return json({ error: "Unknown session" }, 404, cors);
+      const season = getSeason(state.seasonId);
+      const sus = season.suspects.find((s) => s.id === body?.suspectId);
+      if (!sus) return json({ error: "Unknown suspect" }, 400, cors);
+      return json({ assistPresent: body?.assisted === true ? findAssistPresent(season, state, sus.id) : null }, 200, cors);
     }
 
     if (req.method === "POST" && path === "/api/season/interrogate") {
@@ -248,6 +281,8 @@ export function createSeasonApp({ store, model, corsOrigins = [] }) {
         reply, thread: thread ? thread.id : "none", delta,
         composure: thread ? saved.composure[sus.id][thread.id] : null,
         broke, stonewall, unlocked, episodeAdvanced,
+        suggested: normalizeSeasonSuggested(parsed.suggested),
+        assistPresent: body?.assisted === true ? findAssistPresent(season, saved, sus.id) : null,
         state: publicState(saved, season),
       }, 200, cors);
     }
@@ -284,7 +319,7 @@ export function createSeasonApp({ store, model, corsOrigins = [] }) {
       const episodeAdvanced = unlocked.length ? applyGates(state, season) : null;
       const saved = await store.saveSession(state);
 
-      return json({ reply, implicated: implicates, broke: implicates, unlocked, episodeAdvanced, state: publicState(saved, season) }, 200, cors);
+      return json({ reply, implicated: implicates, broke: implicates, unlocked, episodeAdvanced, suggested: normalizeSeasonSuggested(parsed.suggested), assistPresent: body?.assisted === true ? findAssistPresent(season, saved, sus.id) : null, state: publicState(saved, season) }, 200, cors);
     }
 
     if (req.method === "POST" && path === "/api/season/board") {

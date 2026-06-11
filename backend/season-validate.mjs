@@ -23,6 +23,7 @@ export function validateSeason(season) {
     for (const t of s.threads) {
       for (const u of t.unlocks || []) ref(clueIds.has(u), `thread ${s.id}.${t.id} unlocks missing clue '${u}'`);
       ref(typeof t.startComposure === "number" && t.startComposure > 0, `thread ${s.id}.${t.id} bad startComposure`);
+      ref(typeof t.ask === "string" && t.ask.trim().length > 0, `thread ${s.id}.${t.id} missing ask question`);
     }
   }
   for (const c of season.contradictions) {

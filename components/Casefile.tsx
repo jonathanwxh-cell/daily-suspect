@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api-client";
 // Additive: talks only to /api/season/*. The daily game is untouched.
 // ============================================================
 
-type Thread = { id: string; label: string; hint: string };
+type Thread = { id: string; label: string; hint: string; ask: string };
 type Suspect = { id: string; name: string; role: string; age: number; initials: string; color: string; portrait: string; blurb: string; threads: Thread[] };
 type Clue = { id: string; kind: "statement" | "evidence"; title: string; text: string };
 type BoardQ = { id: string; prompt: string; kind: "suspect" | "clue" };
@@ -57,6 +57,10 @@ export default function Casefile() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [musicOn, setMusicOn] = useState(false);
   const toggleMusic = () => { const a = audioRef.current; if (!a) return; if (musicOn) a.pause(); else { a.volume = 0.4; a.play().catch(() => {}); } setMusicOn(!musicOn); };
+  const [assisted, setAssisted] = useState(true);
+  const [suggested, setSuggested] = useState<string[]>([]);
+  const [assistPresent, setAssistPresent] = useState<{ clueId: string; title: string } | null>(null);
+  useEffect(() => { try { const v = localStorage.getItem("ds-casefile-assist"); if (v !== null) setAssisted(v === "1"); } catch {} }, []);
 
   useEffect(() => { apiFetch<{ case: CaseData }>("/api/season/case?id=holloway").then((d) => setCaseData(d.case)).catch(() => setErr("Casefile is offline. Try again shortly.")); }, []);
   useEffect(() => { const id = typeof window !== "undefined" ? localStorage.getItem(STORE_KEY) : null; if (id) resume(id); }, []);
@@ -93,7 +97,7 @@ export default function Casefile() {
     setBusy(true); setErr(""); setDraft("");
     setConvo((c) => ({ ...c, [active]: [...(c[active] || []), { role: "det", text: q }] }));
     try {
-      const r = await apiFetch<any>("/api/season/interrogate", { method: "POST", body: JSON.stringify({ sessionId, suspectId: active, question: q }) });
+      const r = await apiFetch<any>("/api/season/interrogate", { method: "POST", body: JSON.stringify({ sessionId, suspectId: active, question: q, assisted }) });
       const label = caseData?.suspects.find((s) => s.id === active)?.threads.find((t) => t.id === r.thread)?.label;
       const meta = r.stonewall
         ? `— ${label}: they won't budge on this without hard proof. Find evidence and ▣ Present it.`
@@ -101,7 +105,7 @@ export default function Casefile() {
         ? "— didn't land on anything they're hiding"
         : `— ${label}: ${reaction(r.delta, r.broke)}`;
       setConvo((c) => ({ ...c, [active!]: [...(c[active!] || []), { role: "sus", text: r.reply, meta }] }));
-      sync(r.state); handleUnlocks(r.unlocked, r.episodeAdvanced);
+      sync(r.state); handleUnlocks(r.unlocked, r.episodeAdvanced); setSuggested(r.suggested || []); if (assisted) setAssistPresent(r.assistPresent || null);
     } catch (e: any) { setErr(e?.message === "Bad model output" ? "They mumbled something. Ask again." : "The line went quiet. Ask again."); setConvo((c) => ({ ...c, [active!]: (c[active!] || []).slice(0, -1) })); }
     setBusy(false);
   }
@@ -112,13 +116,30 @@ export default function Casefile() {
     const clue = state?.caseFile.find((c) => c.id === clueId);
     setConvo((c) => ({ ...c, [active!]: [...(c[active!] || []), { role: "det", text: `[You lay out: ${clue?.title}]` }] }));
     try {
-      const r = await apiFetch<any>("/api/season/present", { method: "POST", body: JSON.stringify({ sessionId, suspectId: active, clueId }) });
+      const r = await apiFetch<any>("/api/season/present", { method: "POST", body: JSON.stringify({ sessionId, suspectId: active, clueId, assisted }) });
       const meta = r.implicated ? "— the evidence lands; their story breaks" : "— they brush it off; it doesn't touch them";
       setConvo((c) => ({ ...c, [active!]: [...(c[active!] || []), { role: "sus", text: r.reply, meta }] }));
-      sync(r.state); handleUnlocks(r.unlocked, r.episodeAdvanced);
+      sync(r.state); handleUnlocks(r.unlocked, r.episodeAdvanced); setSuggested(r.suggested || []); if (assisted) setAssistPresent(r.assistPresent || null);
     } catch { setErr("The line went quiet. Try again."); }
     setBusy(false);
   }
+
+  async function refreshAssist(suspectId: string, isAssisted: boolean) {
+    if (!sessionId || !isAssisted) { setAssistPresent(null); return; }
+    try {
+      const r = await apiFetch<any>("/api/season/look", { method: "POST", body: JSON.stringify({ sessionId, suspectId, assisted: true }) });
+      setAssistPresent(r.assistPresent || null);
+    } catch {}
+  }
+  function enterRoom(suspectId: string) {
+    setActive(suspectId); setScreen("room"); setSuggested([]); setAssistPresent(null);
+    refreshAssist(suspectId, assisted);
+  }
+  const setAssist = (v: boolean) => {
+    setAssisted(v);
+    try { localStorage.setItem("ds-casefile-assist", v ? "1" : "0"); } catch {}
+    if (active) refreshAssist(active, v); else setAssistPresent(null);
+  };
 
   async function lock(qid: string, answer: string, clues: string[]) {
     if (!sessionId) return;
@@ -191,7 +212,12 @@ export default function Casefile() {
               </div>
             </div>
             <button onClick={begin} disabled={busy} className="w-full mt-4 py-3 ds-display tracking-widest text-base disabled:opacity-60" style={{ background: accent, color: "#14120f", border: "none" }}>{busy ? "OPENING…" : "OPEN THE CASE →"}</button>
-            <p className="text-[11px] opacity-50 mt-3 leading-relaxed">Five people, one killer. Question them, find the contradictions, press the guilty with evidence, then prove who, how, and why on the board.</p>
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-[10px] tracking-widest opacity-60">DIFFICULTY</span>
+              <button onClick={() => setAssist(true)} className="text-[10px] tracking-widest px-2 py-1" style={{ border: `1px solid ${assisted ? accent : "#e8dfc822"}`, background: "none", color: assisted ? accent : "#e8dfc888" }}>ASSISTED</button>
+              <button onClick={() => setAssist(false)} className="text-[10px] tracking-widest px-2 py-1" style={{ border: `1px solid ${!assisted ? accent : "#e8dfc822"}`, background: "none", color: !assisted ? accent : "#e8dfc888" }}>CLASSIC</button>
+            </div>
+            <p className="text-[11px] opacity-50 mt-2 leading-relaxed">{assisted ? "Assisted: tap suggested questions and the game points you to the clue to present." : "Classic: questions still suggested, but you choose which clue cracks them and solve the board yourself."} Free-form typing always works.</p>
           </div>
         )}
 
@@ -204,7 +230,7 @@ export default function Casefile() {
               {caseData.suspects.map((s) => {
                 const broken = caseData.suspects.length && state.brokenThreads.filter((k) => k.startsWith(s.id + ".")).length;
                 return (
-                  <button key={s.id} onClick={() => { setActive(s.id); setScreen("room"); }} className="w-full ds-paper p-0 text-left" style={{ border: "none", display: "block" }}>
+                  <button key={s.id} onClick={() => enterRoom(s.id)} className="w-full ds-paper p-0 text-left" style={{ border: "none", display: "block" }}>
                     <div className="ds-paper-edge" />
                     <div className="p-3 flex gap-3 items-center">
                       <Portrait s={s} size={56} />
@@ -231,10 +257,15 @@ export default function Casefile() {
               <div className="flex items-center gap-3 mb-2">
                 <Portrait s={s} size={52} />
                 <div className="flex-1 min-w-0"><span className="ds-display text-base">{s.name}</span><p className="text-[11px] opacity-70" style={{ color: s.color }}>{s.role}</p></div>
+                <button onClick={() => setAssist(!assisted)} title="Assisted mode surfaces suggested questions and the exact clue to present; Classic makes you deduce it." className="text-[9px] tracking-widest px-2 py-1 mr-1" style={{ border: "1px solid #e8dfc822", background: "none", color: assisted ? accent : "#e8dfc888" }}>{assisted ? "ASSIST ✓" : "ASSIST ✗"}</button>
                 <button onClick={() => setScreen("roster")} className="text-[10px] tracking-widest opacity-60" style={{ background: "none", border: "none", color: "#e8dfc8" }}>ALL ▸</button>
               </div>
               <div className="flex gap-1.5 flex-wrap mb-2">
-                {s.threads.map((t) => { const broke = state.brokenThreads.includes(`${s.id}.${t.id}`); return (<span key={t.id} className="text-[9px] tracking-widest px-2 py-1" style={{ border: `1px solid ${broke ? "#5f9e6e88" : "#e8dfc822"}`, color: broke ? "#7fcf90" : "#e8dfc8aa" }}>{broke ? "✓ " : ""}{t.label}</span>); })}
+                {s.threads.map((t) => {
+                  const broke = state.brokenThreads.includes(`${s.id}.${t.id}`);
+                  if (broke) return (<span key={t.id} className="text-[9px] tracking-widest px-2 py-1" style={{ border: "1px solid #5f9e6e88", color: "#7fcf90" }}>✓ {t.label}</span>);
+                  return (<button key={t.id} disabled={busy} onClick={() => ask(t.ask)} title={t.hint} className="text-[9px] tracking-widest px-2 py-1 disabled:opacity-40" style={{ border: "1px solid #e8dfc833", background: "none", color: "#e8dfc8aa" }}>{t.label}</button>);
+                })}
               </div>
 
               <div ref={scrollRef} className="ds-scroll overflow-y-auto pr-1 my-2" style={{ height: "38vh", minHeight: 200 }}>
@@ -259,6 +290,12 @@ export default function Casefile() {
                 </div></div>
               ) : (
                 <div className="space-y-1.5">
+                  {assisted && assistPresent && (
+                    <button disabled={busy} onClick={() => present(assistPresent.clueId)} className="w-full px-3 py-2 text-xs ds-display tracking-widest disabled:opacity-40" style={{ border: `1px solid ${accent}`, background: `${accent}22`, color: "#f0c0c0" }}>▣ PRESENT: {assistPresent.title} →</button>
+                  )}
+                  {suggested.map((q, i) => (
+                    <button key={i} disabled={busy} onClick={() => ask(q)} className="ds-chip w-full px-3 py-2 text-xs leading-snug disabled:opacity-40" style={{ textAlign: "left" }}>{q}</button>
+                  ))}
                   <div className="flex gap-1.5">
                     <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && draft.trim() && !busy) ask(draft.trim()); }} placeholder="ask them something…" className="flex-1 px-3 py-2 text-xs bg-transparent outline-none" style={{ border: "1px solid #e8dfc833", color: "#e8dfc8" }} />
                     <button disabled={busy || !draft.trim()} onClick={() => ask(draft.trim())} className="px-3 text-xs ds-display disabled:opacity-30" style={{ border: "1px solid #e8dfc855", background: "none", color: "#e8dfc8" }}>ASK</button>
