@@ -9,12 +9,22 @@
 - [x] Set `NEXT_PUBLIC_DAILY_SUSPECT_API_URL` in Vercel
 - [x] Production desktop and 390px mobile playtest against the Hetzner API
 
-## Next (v0.5 - pick one per session)
+## Now (v0.6 - polish pass, shipped; jury 5x8/10)
+- [x] Difficulty rework: severity->deterministic delta, temp 0.2 consistency, filler floor, repeat guard
+- [x] Accusation integrity: HUNCH (no 0-question win), sealed truth on wrong, NEAR_MISS for worked-but-wrong
+- [x] First-class BLUFF (names-truth / plausible lands, absurd glances off) + per-turn "read" feedback
+- [x] 4 new cases -> 7 total (Tupperware, The Date, Salieri/History, Voight-Kampff) + AI noir portraits
+- [x] Room CASE FILE panel, separated ACCUSE, shuffled theories, outcome-aware verdict, SFX default on
+- [x] Spoiler-free share card with day number + localStorage streak
+- [x] 5-profile AI playtest jury harness (docs/jury/)
+
+## Next (pick one per session)
 - [ ] Rate limit `/api/interrogate` before sharing the URL widely
-- [ ] Daily case pipeline: agent writes a new case, second pass adversarially playtests it, human approves, merge
+- [ ] Featured single "Today's Suspect" + cloud-persisted streak (currently free menu + browser-only streak)
+- [ ] Reveal a partial truth / "the thread you missed" on a wrong accusation (retention)
+- [ ] Theories earned via intel rather than all shown up front; an occasional "obvious theory is a trap" case
 - [ ] Anonymous results table + per-case leaderboard
-- [ ] Daily rotation: select case by date and share day number
-- [ ] 3 more cases: sci-fi Voight-Kampff, The Date, History
+- [ ] Daily case pipeline: agent writes a new case, adversarial playtest, human approves, merge
 
 ## Later
 - [ ] Streaks + local detective rank progression

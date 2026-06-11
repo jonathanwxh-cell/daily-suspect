@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-06-11 - Polish pass (jury-driven, 5x8/10)
+
+A 5-profile AI playtest jury (short-attention / puzzle / narrative / casual / QA) drove this pass
+from an average 6.6/10 to 8.0/10, every profile >= 8. Harness + results in `docs/jury/`.
+
+### Gameplay / difficulty (backend)
+- Composure damage is now model-judged **severity (0-3) -> deterministic delta** (-2/-9/-16/-26),
+  with model temperature 0.2 for consistent run-to-run scoring (killed the old delta dice-roll).
+- Accusation integrity: a blind/near-blind correct guess is a **HUNCH** (rank "?", truth sealed) — no
+  more 0-question coin-flip win; a wrong accusation **seals the truth** (no spoiler/answer-leak), and a
+  worked-but-wrong call is a **NEAR_MISS** (rank D) rather than a flat F. Ranks reflect actual play.
+- **Repeat-question guard** (-> delta 0), **filler floor** (-2), and **BLUFF that names the truth or is
+  plausible+undisprovable lands** while absurd bluffs glance off.
+- Guaranteed in-room confession on a crack; per-turn **`read`** ("why it landed") + `questionsRemaining`.
+
+### Content
+- 3 -> **7 cases**: added Tupperware Heist (comedy/EASY), The Plus-One Problem (dating/MED),
+  The Vienna Requiem (history/MED), The Off-World Tell (sci-fi/HARD). Each with an AI noir portrait.
+
+### Frontend
+- Interrogation room **CASE FILE panel** (fills the empty void) + inline intel; separated **ACCUSE**
+  with a stakes hint; shuffled theory order; outcome-aware verdict (incl. sealed-truth + NEAR_MISS);
+  spoiler-free **share card with day number + streak**; SFX on by default; per-line `read` feedback.
+
+### Tests
+- `npm test` 8/8; `npm run build` passes.
+
 ## 2026-06-11 - Free-forever front page
 
 ### Changed
