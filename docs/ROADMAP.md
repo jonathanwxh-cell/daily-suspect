@@ -1,13 +1,13 @@
 # ROADMAP
 
-## Now (v0.4 - in progress)
+## Now (v0.4 - shipped)
 - [x] Move game compute from Vercel API routes to Hetzner Node backend
 - [x] Add backend-owned sessions for transcript, composure, question count, cracked state, and verdicts
 - [x] Add Postgres session store for Hetzner plus memory store for tests/local development
 - [x] Convert Vercel app to frontend-only API client
-- [ ] Deploy backend to Hetzner systemd + Cloudflare Tunnel
-- [ ] Set `NEXT_PUBLIC_DAILY_SUSPECT_API_URL` in Vercel
-- [ ] Production desktop and 390px mobile playtest against the Hetzner API
+- [x] Deploy backend to Hetzner systemd + Cloudflare Tunnel
+- [x] Set `NEXT_PUBLIC_DAILY_SUSPECT_API_URL` in Vercel
+- [x] Production desktop and 390px mobile playtest against the Hetzner API
 
 ## Next (v0.5 - pick one per session)
 - [ ] Rate limit `/api/interrogate` before sharing the URL widely

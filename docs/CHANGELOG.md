@@ -18,6 +18,13 @@
 ### Tests
 - Added `backend/app.test.mjs` for the Hetzner API contract.
 - `npm test` passes.
+- `npm run build` passes.
+- Public Hetzner API checks pass through Cloudflare:
+  - `GET /health`
+  - `GET /api/cases` without reveal fields
+  - `POST /api/session`
+  - `POST /api/interrogate` with a live Sapiens turn
+- Production Vercel playtest passes on desktop and 390px mobile viewport.
 
 ## 2026-06-11 - Sapiens provider migration
 
