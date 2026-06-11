@@ -420,11 +420,18 @@ export default function Game() {
         </div>
       )}
 
-      <div className="max-w-md mx-auto px-4 pb-10 pt-5 relative" style={{ zIndex: 10 }}>
+      <div className={(screen === "title" ? "max-w-6xl" : "max-w-md") + " mx-auto px-4 pb-10 pt-5 relative"} style={{ zIndex: 10 }}>
         <div className="flex items-center justify-between mb-4">
           <button onClick={reset} className="ds-display text-lg tracking-widest" style={{ color: "#e8dfc8", background: "none", border: "none" }}>
             DAILY SUSPECT
           </button>
+          {screen === "title" && (
+            <nav className="hidden md:flex items-center gap-6 text-[11px] tracking-widest opacity-70">
+              <a href="#case-board" className="hover:opacity-100">CASES</a>
+              <a href="#how-it-works" className="hover:opacity-100">HOW IT WORKS</a>
+              <a href="#free-forever" className="hover:opacity-100">FREE FOREVER</a>
+            </nav>
+          )}
           <div className="flex gap-1.5">
             <button onClick={toggleSound} className="text-[11px] px-2 py-1 ds-chip" aria-label="Toggle sound effects">
               {soundOn ? "SFX ✓" : "SFX ✗"}
@@ -436,12 +443,75 @@ export default function Game() {
         </div>
 
         {screen === "title" && (
-          <div className="ds-fade">
-            <p className="text-sm opacity-70 mb-1">One suspect. A handful of questions.</p>
-            <h1 className="ds-display text-4xl leading-tight mb-2 ds-title-flicker" style={{ color: "#e8dfc8", textShadow: "0 0 24px #e8dfc822" }}>
-              Make them<br />talk.
-            </h1>
-            <p className="text-[11px] opacity-50 mb-5">Turn on ♫ and SFX. This game is meant to be heard.</p>
+          <div className="ds-fade ds-front">
+            <section className="ds-hero">
+              <div className="ds-hero-copy">
+                <h1 className="ds-display ds-hero-title ds-title-flicker">
+                  Daily<br className="hidden sm:block" /> Suspect
+                </h1>
+                <p className="ds-hero-line">One suspect. A handful of questions. One hidden truth.</p>
+                <p id="free-forever" className="ds-free-line">Free forever. No account. No paid case locks.</p>
+                <div className="ds-hero-actions">
+                  <button
+                    onClick={() => document.getElementById("case-board")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="ds-hero-primary"
+                  >
+                    START INVESTIGATION
+                  </button>
+                  <button
+                    onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="ds-hero-secondary"
+                  >
+                    HOW IT WORKS
+                  </button>
+                </div>
+              </div>
+              <div className="ds-case-board" aria-hidden="true">
+                <div className="ds-board-string" />
+                <div className="ds-evidence ds-evidence-a">
+                  <span>LIVE FILE</span>
+                  <strong>AI SUSPECT</strong>
+                </div>
+                <div className="ds-evidence ds-evidence-b">
+                  <span>VERDICT</span>
+                  <strong>HIDDEN</strong>
+                </div>
+                <div className="ds-evidence-photo">
+                  {cases[0] ? <Portrait caze={cases[0]} size={118} tilt={-3} /> : <div className="ds-photo-skeleton" />}
+                </div>
+                <div className="ds-board-stamp ds-display">Free<br />Forever</div>
+              </div>
+            </section>
+
+            <section className="ds-front-stats" aria-label="Game facts">
+              <div><strong>3</strong><span>launch cases</span></div>
+              <div><strong>1</strong><span>live AI turn per question</span></div>
+              <div><strong>0</strong><span>paid locks</span></div>
+            </section>
+
+            <section id="how-it-works" className="ds-steps" aria-label="How it works">
+              <div>
+                <span>01</span>
+                <h2 className="ds-display">Pick a suspect</h2>
+                <p>Choose a case file and read the evidence before entering the room.</p>
+              </div>
+              <div>
+                <span>02</span>
+                <h2 className="ds-display">Ask better questions</h2>
+                <p>Use empathy, logic, pressure, or bluffing to hit the real weak point.</p>
+              </div>
+              <div>
+                <span>03</span>
+                <h2 className="ds-display">Close the file</h2>
+                <p>Break their composure for a confession, or spend your last question on a theory.</p>
+              </div>
+            </section>
+
+            <section id="case-board" className="ds-front-cases">
+              <div className="ds-section-head">
+                <h2 className="ds-display">Open Case Files</h2>
+                <p>Every case is playable. Every future case stays free.</p>
+              </div>
             {casesLoading ? (
               <div className="ds-paper p-4 text-xs opacity-75">Loading case board...</div>
             ) : casesError ? (
@@ -450,7 +520,7 @@ export default function Game() {
                 <button onClick={loadCases} className="ds-chip px-3 py-2 text-xs">TRY AGAIN</button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="ds-case-grid">
                 {cases.map((c, i) => (
                   <button key={c.id} onClick={() => startCase(c)} className="w-full ds-paper p-0 text-left" style={{ border: "none", display: "block", transform: `rotate(${i % 2 ? 0.6 : -0.6}deg)` }}>
                     <div className="ds-paper-edge" />
@@ -473,6 +543,7 @@ export default function Game() {
             <p className="text-[11px] opacity-50 mt-5 leading-relaxed">
               Every suspect hides one truth. Hit a pressure point and their composure drops — drop it to zero and they break. Or run out of questions and stake your accusation.
             </p>
+            </section>
           </div>
         )}
 

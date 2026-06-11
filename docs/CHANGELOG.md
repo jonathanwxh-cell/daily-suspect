@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-11 - Free-forever front page
+
+### Changed
+- Reworked the first screen into a noir front page inspired by modern web-game launch pages while keeping Daily Suspect's own case-board identity.
+- Added hero CTAs, free-forever messaging, compact game facts, a three-step explainer, and a wider responsive case-file grid.
+- Kept the game free forever: no account prompt, pricing, subscription, or paywall UI.
+
+### Tests
+- `npm test` passes.
+- `npm run build` passes.
+- Local browser QA passes on desktop and 390px mobile, including no horizontal overflow and click-through into a case briefing.
+
 ## 2026-06-11 - Production operations handoff
 
 ### Added
