@@ -12,6 +12,20 @@ import type { PublicCase, Suggested } from "@/lib/types";
 
 type Msg = { role: "det" | "sus"; text: string; delta?: number };
 
+type Outcome = "CONFESSED" | "CASE_CLOSED" | "HUNCH" | "WALKED_FREE";
+type Verdict = {
+  outcome: Outcome;
+  correct: boolean;
+  blindGuess: boolean;
+  truthSealed: boolean;
+  reveal: string;
+  theory: string | null;
+  rank: string;
+  questionsUsed: number;
+  budget: number;
+  intelCount: number;
+};
+
 // ---------- Procedural SFX (Web Audio, zero assets) ----------
 function makeSfx() {
   let ctx: AudioContext | null = null;
@@ -187,10 +201,10 @@ export default function Game() {
   const [suggested, setSuggested] = useState<Suggested[]>([]);
   const [busy, setBusy] = useState(false);
   const [cracked, setCracked] = useState(false);
-  const [verdict, setVerdict] = useState<{ correct: boolean; reveal: string; theory: string | null } | null>(null);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [customQ, setCustomQ] = useState("");
   const [pulse, setPulse] = useState(0);
-  const [soundOn, setSoundOn] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
   const [musicOn, setMusicOn] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errMsg, setErrMsg] = useState("");
@@ -200,11 +214,34 @@ export default function Game() {
   const [intelUnlocked, setIntelUnlocked] = useState<string[]>([]);
   const [toast, setToast] = useState<{ text: string; k: number } | null>(null);
   const [biggestHit, setBiggestHit] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [theoryOrder, setTheoryOrder] = useState<number[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sfxRef = useRef<any>(null);
   if (!sfxRef.current && typeof window !== "undefined") sfxRef.current = makeSfx();
   const sfx = sfxRef.current || { tap() {}, type() {}, hit() {}, stamp() {}, crack() {}, beat() {} };
+
+  // Daily identity: a stable day index + a localStorage streak that ticks on wins.
+  const dayNumber = Math.floor((Date.now() - Date.UTC(2026, 0, 1)) / 86400000) + 1;
+  const shuffle = (arr: number[]) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const bumpStreak = () => {
+    try {
+      const raw = localStorage.getItem("ds-streak");
+      const prev = raw ? JSON.parse(raw) : { day: 0, streak: 0 };
+      if (prev.day === dayNumber) return;
+      const next = prev.day === dayNumber - 1 ? (prev.streak || 0) + 1 : 1;
+      localStorage.setItem("ds-streak", JSON.stringify({ day: dayNumber, streak: next }));
+      setStreak(next);
+    } catch {}
+  };
 
   const loadCases = async () => {
     setCasesLoading(true);
@@ -227,6 +264,16 @@ export default function Game() {
     const t = setInterval(() => setPulse((p) => p + 0.15), 80);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ds-streak");
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.day === dayNumber || s.day === dayNumber - 1) setStreak(s.streak || 0);
+      }
+    } catch {}
+  }, [dayNumber]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight + 400;
@@ -272,6 +319,7 @@ export default function Game() {
       setVerdict(null);
       setIntelUnlocked([]);
       setBiggestHit(0);
+      setTheoryOrder(shuffle([...Array(caze.theories.length).keys()]));
       setScreen("enter");
       setTimeout(() => setScreen("room"), 1400);
     } catch {
@@ -292,13 +340,26 @@ export default function Game() {
   const fetchVerdict = async (theoryIndex: number, theoryLabel: string | null) => {
     if (!caze || !sessionId) return;
     try {
-      const r = await apiFetch<{ correct: boolean; reveal: string }>("/api/accuse", {
+      const r = await apiFetch<Verdict>("/api/accuse", {
         method: "POST",
         body: JSON.stringify({ sessionId, theoryIndex }),
       });
-      setVerdict({ correct: !!r.correct, reveal: r.reveal || "", theory: theoryLabel });
+      const v: Verdict = { ...r, theory: r.theory ?? theoryLabel };
+      setVerdict(v);
+      if (v.outcome === "CONFESSED" || v.outcome === "CASE_CLOSED") bumpStreak();
     } catch {
-      setVerdict({ correct: theoryIndex === -1, reveal: "", theory: theoryLabel });
+      setVerdict({
+        outcome: theoryIndex === -1 ? "CONFESSED" : "WALKED_FREE",
+        correct: theoryIndex === -1,
+        blindGuess: false,
+        truthSealed: theoryIndex !== -1,
+        reveal: "",
+        theory: theoryLabel,
+        rank: theoryIndex === -1 ? "B" : "F",
+        questionsUsed,
+        budget: caze.budget,
+        intelCount: intelUnlocked.length,
+      });
     }
   };
 
@@ -362,22 +423,24 @@ export default function Game() {
     setScreen("verdict");
   };
 
-  const won = cracked || !!(verdict && verdict.correct);
-
-  const rank = (() => {
-    if (!caze) return "—";
-    if (cracked) {
-      const ratio = questionsUsed / caze.budget;
-      return ratio <= 0.45 ? "S" : ratio <= 0.75 ? "A" : "B";
-    }
-    if (won) return intelUnlocked.length >= 2 ? "B" : "C";
-    return "F";
-  })();
+  const outcome: Outcome | null = verdict?.outcome ?? (cracked ? "CONFESSED" : null);
+  const won = outcome === "CONFESSED" || outcome === "CASE_CLOSED";
+  const rank = verdict?.rank ?? "—";
 
   const shareText = () => {
-    if (!caze) return "";
-    const qMarks = "❓".repeat(questionsUsed) + (won ? "✅" : "❌");
-    return `DAILY SUSPECT — ${caze.crime}\n${qMarks} ${cracked ? "CONFESSION" : won ? "CASE CLOSED" : "WALKED FREE"} in ${questionsUsed}/${caze.budget} · RANK ${rank}\n🫀 composure ${caze.startComposure} → ${composure} · biggest hit −${biggestHit}`;
+    if (!caze || !outcome) return "";
+    const label =
+      outcome === "CONFESSED" ? "CONFESSION" :
+      outcome === "CASE_CLOSED" ? "CASE CLOSED" :
+      outcome === "HUNCH" ? "LUCKY HUNCH" : "WALKED FREE";
+    const icon =
+      outcome === "CONFESSED" ? "🚨" :
+      outcome === "CASE_CLOSED" ? "🔒" :
+      outcome === "HUNCH" ? "🎲" : "🚪";
+    const broke = Math.max(0, Math.min(8, Math.round((1 - composure / caze.startComposure) * 8)));
+    const bar = "🟥".repeat(broke) + "⬛".repeat(8 - broke);
+    const streakLine = streak > 1 ? `\n🔥 ${streak}-day streak` : "";
+    return `DAILY SUSPECT #${dayNumber} — ${caze.crime}\n${icon} ${label} · ${questionsUsed}/${caze.budget} Q · RANK ${rank}\n${bar}${streakLine}\ndaily-suspect.vercel.app`;
   };
 
   const copyShare = () => {
@@ -618,6 +681,26 @@ export default function Game() {
             </div>
 
             <div ref={scrollRef} className="ds-scroll overflow-y-auto pr-1 my-2" style={{ height: "36vh", minHeight: 190 }}>
+              <div className="ds-paper mb-3">
+                <div className="ds-paper-edge" />
+                <div className="p-3">
+                  <p className="text-[10px] tracking-widest opacity-60 mb-1.5">CASE FILE · {caze.difficulty}</p>
+                  <ul className="space-y-1">
+                    {caze.briefing.map((b, bi) => (
+                      <li key={bi} className="text-[11px] leading-snug flex gap-1.5">
+                        <span style={{ color: caze.color }}>▪</span><span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {intelUnlocked.length > 0 && (
+                    <div className="mt-2 pt-2" style={{ borderTop: "1px dashed #2a241955" }}>
+                      {intelUnlocked.map((note, ii) => (
+                        <p key={ii} className="text-[11px] leading-snug" style={{ color: "#b3262a", fontWeight: 700 }}>★ {note}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
               {transcript.map((m, i) =>
                 m.role === "det" ? (
                   <div key={i} className="ds-fade mb-2.5">
@@ -659,9 +742,14 @@ export default function Game() {
                     ASK
                   </button>
                 </div>
-                <button onClick={() => { if (soundOn) sfx.tap(); setScreen("accuse"); }} disabled={busy} className="w-full py-2 mt-1 text-xs tracking-widest disabled:opacity-40" style={{ border: "1px solid #b3262a88", color: "#e08884", background: "none" }}>
-                  ⚖ MAKE YOUR ACCUSATION
-                </button>
+                <div className="mt-3 pt-2.5" style={{ borderTop: "1px dashed #e8dfc822" }}>
+                  <button onClick={() => { if (soundOn) sfx.tap(); setScreen("accuse"); }} disabled={busy} className="w-full py-2 text-xs tracking-widest disabled:opacity-40" style={{ border: "1px solid #b3262a88", color: "#e08884", background: "none" }}>
+                    ⚖ CLOSE THE FILE & ACCUSE
+                  </button>
+                  <p className="text-[9px] opacity-40 text-center mt-1.5 leading-snug">
+                    Break them for a confession — or close the file when you&rsquo;ve got the truth. Accuse wrong and it stays sealed.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -685,12 +773,13 @@ export default function Game() {
               </div>
             )}
             <div className="space-y-2">
-              {caze.theories.map((label, i) => (
-                <button key={i} onClick={() => makeAccusation(i)} className="ds-chip w-full px-3 py-3 text-xs leading-snug">
-                  {label}
+              {(theoryOrder.length ? theoryOrder : caze.theories.map((_, i) => i)).map((origIdx) => (
+                <button key={origIdx} onClick={() => makeAccusation(origIdx)} className="ds-chip w-full px-3 py-3 text-xs leading-snug">
+                  {caze.theories[origIdx]}
                 </button>
               ))}
             </div>
+            <p className="text-[10px] opacity-50 text-center mt-2">One shot. If you&rsquo;re wrong, the truth stays sealed.</p>
             {questionsUsed < caze.budget && (
               <button onClick={() => setScreen("room")} className="w-full mt-3 py-2 text-xs opacity-60" style={{ background: "none", border: "none", color: "#e8dfc8" }}>
                 ← back to the room ({caze.budget - questionsUsed} questions left)
@@ -702,37 +791,54 @@ export default function Game() {
         {screen === "verdict" && caze && (
           <div className="ds-fade text-center">
             <div className="py-5">
-              <span className="ds-stamp text-3xl" style={{ color: won ? "#5f9e6e" : "#e05555" }}>
-                {cracked ? "Confessed" : won ? "Case Closed" : "Walked Free"}
+              <span className="ds-stamp text-3xl" style={{ color: won ? "#5f9e6e" : outcome === "HUNCH" ? "#c9913a" : "#e05555" }}>
+                {outcome === "CONFESSED" ? "Confessed" : outcome === "CASE_CLOSED" ? "Case Closed" : outcome === "HUNCH" ? "Lucky Hunch" : "Walked Free"}
               </span>
+              <p className="text-[11px] opacity-70 mt-3 px-6 leading-snug">
+                {outcome === "CONFESSED" ? "You broke them. Full confession on the record." :
+                 outcome === "CASE_CLOSED" ? "Right call, backed by your interrogation. Truth declassified." :
+                 outcome === "HUNCH" ? "You guessed right — but you never earned the why." :
+                 "Wrong call. They walked, and the truth stays sealed."}
+              </p>
               <div className="mt-4">
-                <span className="ds-display text-5xl" style={{ color: rank === "S" ? "#c9913a" : rank === "F" ? "#e05555" : "#e8dfc8", textShadow: "0 0 26px currentColor" }}>
+                <span className="ds-display text-5xl" style={{ color: rank === "S" ? "#c9913a" : rank === "F" || rank === "?" ? "#e05555" : "#e8dfc8", textShadow: "0 0 26px currentColor" }}>
                   {rank}
                 </span>
-                <p className="text-[10px] tracking-widest opacity-60 mt-1">DETECTIVE RANK</p>
+                <p className="text-[10px] tracking-widest opacity-60 mt-1">
+                  DETECTIVE RANK{streak > 1 ? ` · 🔥 ${streak}-DAY STREAK` : ""}
+                </p>
               </div>
             </div>
-            <div className="ds-paper text-left" style={{ transform: "rotate(-0.4deg)" }}>
-              <div className="ds-paper-edge" />
-              <div className="p-4">
-                <p className="text-[10px] tracking-widest opacity-60 mb-1">THE TRUTH — DECLASSIFIED</p>
-                <p className="text-xs leading-relaxed">{verdict?.reveal || "…"}</p>
-                {cracked && (
-                  <p className="text-xs leading-relaxed mt-2 italic opacity-80">Broken in {questionsUsed} question{questionsUsed === 1 ? "" : "s"}. Biggest hit: −{biggestHit} composure.</p>
-                )}
-                {!cracked && verdict?.theory && (
-                  <p className="text-xs mt-2" style={{ color: won ? "#3c6e4c" : "#b3262a" }}>
-                    Your theory: “{verdict.theory}” — {won ? "correct." : "wrong."}
-                  </p>
-                )}
+            {verdict?.truthSealed ? (
+              <div className="text-left" style={{ border: "1px dashed #b3262a66", padding: 16 }}>
+                <p className="text-[10px] tracking-widest mb-1" style={{ color: "#e08884" }}>THE TRUTH — SEALED</p>
+                <p className="text-xs leading-relaxed opacity-80">
+                  {outcome === "HUNCH"
+                    ? "A lucky theory isn’t an investigation. Question the suspect — crack them, or earn it with evidence — to declassify what really happened."
+                    : "Case filed unsolved. Break the suspect, or accuse correctly with real evidence, to declassify the truth."}
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="ds-paper text-left" style={{ transform: "rotate(-0.4deg)" }}>
+                <div className="ds-paper-edge" />
+                <div className="p-4">
+                  <p className="text-[10px] tracking-widest opacity-60 mb-1">THE TRUTH — DECLASSIFIED</p>
+                  <p className="text-xs leading-relaxed">{verdict?.reveal || "…"}</p>
+                  {outcome === "CONFESSED" && (
+                    <p className="text-xs leading-relaxed mt-2 italic opacity-80">Broken in {questionsUsed} question{questionsUsed === 1 ? "" : "s"}. Biggest hit: −{biggestHit} composure.</p>
+                  )}
+                  {outcome === "CASE_CLOSED" && verdict?.theory && (
+                    <p className="text-xs mt-2" style={{ color: "#3c6e4c" }}>Your theory: “{verdict.theory}” — correct.</p>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="mt-4 p-3 text-left text-xs whitespace-pre-wrap" style={{ border: "1px dashed #e8dfc844" }}>
               {shareText()}
             </div>
             <div className="flex gap-2 mt-3">
               <button onClick={copyShare} className="flex-1 py-3 ds-display tracking-widest" style={{ background: "#e8dfc8", color: "#14120f", border: "none" }}>
-                {copied ? "COPIED ✓" : "COPY RESULT"}
+                {copied ? "COPIED ✓" : "SHARE RESULT"}
               </button>
               <button onClick={reset} className="flex-1 py-3 ds-display tracking-widest" style={{ border: "1px solid #e8dfc855", background: "none", color: "#e8dfc8" }}>
                 NEXT CASE
