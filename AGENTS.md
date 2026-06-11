@@ -17,6 +17,7 @@ backend/server.mjs            loopback-only Node server for systemd + Cloudflare
 app/globals.css               design tokens + ds-* animation classes
 public/media/                 portraits (1:1 jpg) + theme.mp3
 docs/SPEC.md                  game design rules
+docs/OPERATIONS.md            production URLs, Hetzner services, deploy and verification runbook
 docs/ROADMAP.md               prioritized next work
 docs/IDEAS_INBOX.md           unprioritized ideas; promote to ROADMAP, never build directly
 ```
@@ -51,6 +52,8 @@ npm run build
 
 Then manually play one full case to confession and one to accusation on a mobile-width viewport.
 
+For production, follow `docs/OPERATIONS.md`. It records the Hetzner paths, systemd services, Cloudflare tunnel, Vercel env var, deploy flow, and live verification checklist.
+
 ## Session Handoff
 
-End every working session by updating `docs/ROADMAP.md` with completed work and discovered debt.
+End every working session by updating `docs/ROADMAP.md` with completed work and discovered debt. If infrastructure, deployment, service names, ports, domains, or secret locations change, update `docs/OPERATIONS.md` in the same commit.

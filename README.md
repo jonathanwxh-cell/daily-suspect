@@ -49,4 +49,4 @@ CORS_ORIGINS=https://daily-suspect.vercel.app
 
 ## For AI Agents
 
-Read `AGENTS.md` first. Game design rules live in `docs/SPEC.md`. Planned work lives in `docs/ROADMAP.md`. Raw ideas live in `docs/IDEAS_INBOX.md`.
+Read `AGENTS.md` first. Production operations live in `docs/OPERATIONS.md`. Game design rules live in `docs/SPEC.md`. Planned work lives in `docs/ROADMAP.md`. Raw ideas live in `docs/IDEAS_INBOX.md`.

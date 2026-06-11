@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-11 - Production operations handoff
+
+### Added
+- Added `docs/OPERATIONS.md` with production URLs, Hetzner paths, systemd services, Cloudflare Tunnel details, Vercel env configuration, deploy flow, and verification checklist.
+- Linked the operations runbook from `README.md` and `AGENTS.md`.
+
 ## 2026-06-11 - Hetzner backend and Vercel frontend split
 
 ### Changed
