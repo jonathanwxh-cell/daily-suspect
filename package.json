@@ -2,10 +2,12 @@
   "name": "daily-suspect",
   "version": "0.3.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --test --experimental-strip-types lib/sapiens.test.mts",
     "lint": "next lint"
   },
   "dependencies": {

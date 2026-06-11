@@ -311,7 +311,7 @@ export default function Game({ cases }: { cases: PublicCase[] }) {
       }
     } catch (e: any) {
       setTranscript(newTranscript.slice(0, -1));
-      setErrMsg(e.message === "ANTHROPIC_API_KEY is not configured on the server." ? "Server missing API key — see README." : "Line went dead. Ask again.");
+      setErrMsg(e.message === "SAPIENS_API_KEY is not configured on the server." ? "Server missing API key -- see README." : "Line went dead. Ask again.");
     }
     setBusy(false);
   };

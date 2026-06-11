@@ -7,7 +7,7 @@ Live: https://daily-suspect.vercel.app
 ## How it works
 
 - Each **case** is a pure data object in `lib/cases.ts` — character, hidden truth, pressure points, intel fragments, theories.
-- Each player question = one server-side Claude call (`app/api/interrogate/route.ts`) returning structured JSON: in-character reply, composure delta, three suggested follow-up questions.
+- Each player question = one server-side Sapiens chat-completions call (`app/api/interrogate/route.ts`) returning structured JSON: in-character reply, composure delta, three suggested follow-up questions.
 - The **hidden truth never reaches the browser.** `app/page.tsx` strips secrets via `toPublic()`; verdicts resolve through `app/api/accuse/route.ts`.
 - Zero audio assets: SFX are procedural Web Audio. The noir theme (`public/media/theme.mp3`) and portraits were AI-generated.
 
@@ -15,13 +15,13 @@ Live: https://daily-suspect.vercel.app
 
 ```bash
 npm install
-cp .env.example .env.local   # add your ANTHROPIC_API_KEY
+cp .env.example .env.local   # add your SAPIENS_API_KEY
 npm run dev
 ```
 
 ## Deploy
 
-Pushes to `main` auto-deploy via the linked Vercel project. Required env var (Production + Preview): `ANTHROPIC_API_KEY`. Optional: `ANTHROPIC_MODEL` (defaults to `claude-sonnet-4-6`).
+Pushes to `main` auto-deploy via the linked Vercel project. Required env var (Production + Preview): `SAPIENS_API_KEY`. Optional: `SAPIENS_BASE_URL` (defaults to `https://apihub.agnes-ai.com/v1`) and `SAPIENS_MODEL` (defaults to `agnes-2.0-flash`).
 
 ## For AI agents
 

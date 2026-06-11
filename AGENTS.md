@@ -8,7 +8,7 @@ This repo is built for agent-driven development. A human (Alyosha) reviews specs
 app/page.tsx                  server component — strips case secrets via toPublic()
 components/Game.tsx           ALL client UI + game feel (SFX, typewriter, polygraph, stamps)
 lib/cases.ts                  ALL game content. Server-only. THE source of truth.
-app/api/interrogate/route.ts  one Claude call per question; server-authoritative composure math
+app/api/interrogate/route.ts  one Sapiens chat-completions call per question; server-authoritative composure math
 app/api/accuse/route.ts       verdict resolution (theory correctness + reveal)
 app/globals.css               design tokens + ds-* animation classes ("case file noir" identity)
 public/media/                 portraits (1:1 jpg) + theme.mp3

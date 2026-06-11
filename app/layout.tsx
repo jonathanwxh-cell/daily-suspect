@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://daily-suspect.vercel.app"),
   title: "Daily Suspect — Make them talk.",
   description:
     "An AI interrogation game. One suspect, a handful of questions, one hidden truth. Hit their pressure points, break their composure, get the confession.",
