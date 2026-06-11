@@ -1,5 +1,14 @@
 # ROADMAP
 
+## Now (v0.7 - Casefile mode, shipped; new-mode jury 5x8/10)
+- [x] Long-form closed-circle whodunit mode at `/casefile` (additive; daily game untouched)
+- [x] Season engine: topic interrogation, presentOnly cross-examination, deduction board, server-validated accusation
+- [x] Season 1 "A Death at Holloway House" (5 suspects, watertight clue web) + consistency validator
+- [x] AI noir portraits + a generated theme; save/resume
+- [ ] More seasons / episodes; a surviving plausible suspect (real branching/misdirection)
+- [ ] Board accepts any *sufficient* proof set; suspects escalate under pressure; tighter question→topic routing
+- [ ] Surface full clue text + a board "what's still needed" checklist in the room UI
+
 ## Now (v0.4 - shipped)
 - [x] Move game compute from Vercel API routes to Hetzner Node backend
 - [x] Add backend-owned sessions for transcript, composure, question count, cracked state, and verdicts

@@ -41,6 +41,15 @@ Postgres role                            daily_suspect_app
 
 The Sapiens/Agnes key lives only in the Hetzner backend `.env` as `SAPIENS_API_KEY`.
 
+### Casefile mode (additive)
+
+The long-form Casefile mode shares the same Node backend, mounted on `/api/season/*` (see
+`backend/season-*.mjs`; `server.mjs` routes `/api/season` to it). It uses its own `season_sessions`
+Postgres table in the `daily_suspect` database (auto-created on boot via `ensureSchema`) — the daily
+`sessions` table is untouched. Deploy is identical to the daily backend (sync the `backend/*.mjs` files,
+restart `daily-suspect-api.service`). The frontend lives at `/casefile`; suspect portraits + theme are
+served from `public/media/season/` (Vercel). Validate a season with `validateSeason` before shipping it.
+
 ## Systemd Services
 
 Both services are user services under `alyosha`, enabled at boot, and configured to restart automatically. User lingering is enabled, so they should start after reboot without an SSH login.
@@ -192,6 +201,7 @@ http://127.0.0.1:3000
 - `https://daily-suspect.vercel.app/` returns HTTP 200.
 - `https://daily-suspect-api.alyoechosys.dev/health` returns `{"ok":true}`.
 - `GET /api/cases` returns public cases without reveal fields.
+- `GET /api/season/list` returns the Casefile season(s); `POST /api/season/start` creates a session; `/casefile` loads.
 - Browser playtest reaches the case board.
 - Starting Lucas creates a session and reaches the interrogation room.
 - A live question advances from `Q 0/6` to `Q 1/6` without `Server missing API key` or `Line went dead`.

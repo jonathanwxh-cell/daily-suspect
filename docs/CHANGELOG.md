@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-11 - Casefile mode (long-form whodunit, jury 5x8/10)
+
+A second mode alongside the daily game: **A Death at Holloway House** — a closed-circle murder solved by
+interrogation → cross-examination → a deduction board → a reasoned accusation. **Purely additive** — the
+daily game and its 7 cases are untouched.
+
+### Added
+- **Backend** (`backend/season-*.mjs`, mounted on `/api/season/*` by `server.mjs`): season content format +
+  Season 1 (5 suspects, watertight clue web), a topic-interrogation engine (one model call/turn — the model
+  voices + classifies, the server owns all state), `presentOnly` topics cracked only by presenting the right
+  clue (cross-examination), deterministic clue unlocks, episode gates, and **server-validated** deduction
+  board + accusation. New `season_sessions` Postgres table (auto-created); memory store for tests/local.
+- **Consistency validator** (`season-validate.mjs`) proves every season is solvable before it ships.
+- **Frontend** (`/casefile`, `components/Casefile.tsx`): roster → interrogation room (topic legibility +
+  present-evidence) → Case File → Deduction Board → finale, with save/resume, AI noir suspect portraits, and
+  a generated noir theme. New nav entry; the daily landing is unchanged.
+
+### Tests
+- 8 new season tests (validator + full solve + present + board); `npm test` 14/14; `npm run build` passes.
+- A 5-profile AI jury (narrative / short-attention / deduction / QA / casual) all rate the new mode 8/10 and
+  solve the case. Record in `docs/jury/2026-06-11-season-final.md`.
+
 ## 2026-06-11 - Polish pass (jury-driven, 5x8/10)
 
 A 5-profile AI playtest jury (short-attention / puzzle / narrative / casual / QA) drove this pass
