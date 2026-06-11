@@ -497,6 +497,7 @@ export default function Game() {
               <a href="#case-board" className="hover:opacity-100">CASES</a>
               <a href="#how-it-works" className="hover:opacity-100">HOW IT WORKS</a>
               <a href="#free-forever" className="hover:opacity-100">FREE FOREVER</a>
+              <a href="/casefile" className="hover:opacity-100" style={{ color: "#e0a0a0" }}>CASEFILE</a>
             </nav>
           )}
           <div className="flex gap-1.5">
@@ -549,6 +550,18 @@ export default function Game() {
                 <div className="ds-board-stamp ds-display">Free<br />Forever</div>
               </div>
             </section>
+
+            <a href="/casefile" className="block ds-paper mb-4" style={{ border: "1px solid #b3262a", textDecoration: "none", color: "#2a2419" }}>
+              <div className="ds-paper-edge" />
+              <div className="p-3 flex items-center gap-3">
+                <div className="ds-display text-3xl" style={{ color: "#b3262a", lineHeight: 1 }}>⚖</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] tracking-widest" style={{ color: "#b3262a", fontWeight: 700 }}>NEW · THE LONG GAME</p>
+                  <p className="ds-display text-base leading-tight">Casefile: A Death at Holloway House</p>
+                  <p className="text-xs opacity-80 leading-snug mt-0.5">A feature-length closed-circle whodunit — interrogate five suspects, cross-examine, and crack the case. →</p>
+                </div>
+              </div>
+            </a>
 
             <section className="ds-front-stats" aria-label="Game facts">
               <div><strong>3</strong><span>launch cases</span></div>
